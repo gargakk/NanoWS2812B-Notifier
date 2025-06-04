@@ -183,7 +183,7 @@ void subscribeToTransactions() {
   
   Serial.println("Sottoscrizione inviata");
 }
-
+// New function for check onhly incoming transactions
 void handleWebSocketMessage(uint8_t * payload) {
   DynamicJsonDocument doc(1024);
   DeserializationError error = deserializeJson(doc, payload);
@@ -206,24 +206,37 @@ void handleWebSocketMessage(uint8_t * payload) {
     }
   }
   
-  // Gestione transazioni
+  // Gestione transazioni - SOLO IN ENTRATA
   if (subscribed && doc.containsKey("message")) {
     if (doc["message"].containsKey("block") && doc["message"].containsKey("amount")) {
       String subtype = doc["message"]["block"]["subtype"];
       String amount = doc["message"]["amount"];
       
+      // Controlla se è una transazione "send" (qualcuno ha inviato)
       if (subtype == "send" && amount.length() > 0) {
-        if (amount.length() >= 24) {
-          String integerPart = amount.substring(0, amount.length() - 24);
-          if (integerPart.length() == 0) integerPart = "0";
-          
-          double nanoAmount = integerPart.toDouble() / 1000000.0;
-          
-          Serial.print("Transazione ricevuta: ");
-          Serial.print(nanoAmount, 6);
-          Serial.println(" NANO");
-          
-          animateTransaction();
+        // Verifica che il destinatario sia il nostro indirizzo monitorato
+        String account = doc["message"]["account"];
+        String link_as_account = doc["message"]["block"]["link_as_account"];
+        
+        // Se link_as_account corrisponde al nostro indirizzo, è una transazione IN ENTRATA
+        if (link_as_account == nanoAddress) {
+          if (amount.length() >= 24) {
+            String integerPart = amount.substring(0, amount.length() - 24);
+            if (integerPart.length() == 0) integerPart = "0";
+            
+            double nanoAmount = integerPart.toDouble() / 1000000.0;
+            
+            Serial.print("Transazione IN ENTRATA ricevuta: ");
+            Serial.print(nanoAmount, 6);
+            Serial.println(" NANO");
+            Serial.print("Da: ");
+            Serial.println(account);
+            
+            animateTransaction();
+          }
+        } else {
+          // Debug: mostra quando è una transazione in uscita (opzionale)
+          Serial.println("Transazione in uscita ignorata");
         }
       }
     }
